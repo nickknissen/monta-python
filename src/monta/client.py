@@ -209,14 +209,14 @@ class MontaApiClient:
         charge_objects = [Charge.from_dict(charge) for charge in charges]
         return sorted(charge_objects, key=lambda charge: -charge.id)
 
-    async def async_start_charge(self, charge_point_id: int) -> Any:
+    async def async_start_charge(self, charge_point_id: int) -> Charge:
         """Start a charge on the specified charge point.
 
         Args:
             charge_point_id: The ID of the charge point to start charging on
 
         Returns:
-            The API response data.
+            A Charge object representing the started charging session.
         """
         access_token = await self.async_get_access_token()
 
@@ -231,16 +231,16 @@ class MontaApiClient:
 
         _LOGGER.debug("Started a charge on: %s", charge_point_id)
 
-        return response
+        return Charge.from_dict(response)
 
-    async def async_stop_charge(self, charge_id: int) -> Any:
+    async def async_stop_charge(self, charge_id: int) -> Charge:
         """Stop a charge.
 
         Args:
             charge_id: The ID of the charge to stop
 
         Returns:
-            The API response data.
+            A Charge object representing the stopped charging session.
         """
         access_token = await self.async_get_access_token()
 
@@ -252,9 +252,9 @@ class MontaApiClient:
             headers={"authorization": f"Bearer {access_token}"},
         )
 
-        _LOGGER.debug("Stopped charge for chargeId: %s <%s>", charge_id, response)
+        _LOGGER.debug("Stopped charge for chargeId: %s", charge_id)
 
-        return response
+        return Charge.from_dict(response)
 
     async def async_get_wallet_transactions(
         self,

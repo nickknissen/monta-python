@@ -23,7 +23,7 @@ from .exceptions import (
     MontaApiClientCommunicationError,
     MontaApiClientError,
 )
-from .models import Charge, ChargePoint, TokenResponse, Wallet, WalletTransaction
+from .models import Charge, ChargePoint, ChargeState, TokenResponse, Wallet, WalletTransaction
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,9 +153,9 @@ class MontaApiClient:
     async def async_get_charges(
         self,
         charge_point_id: int,
-        state: str | None = None,
-        from_date: str | None = None,
-        to_date: str | None = None,
+        state: ChargeState | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
         page: int = 0,
         per_page: int = 10,
     ) -> list[Charge]:
@@ -163,10 +163,9 @@ class MontaApiClient:
 
         Args:
             charge_point_id: The ID of the charge point
-            state: Filter by charge state. Valid values: "reserved", "starting",
-                "charging", "stopping", "paused", "scheduled", "stopped", "completed"
-            from_date: Filter charges from this date (ISO 8601 format, e.g., "2025-11-01T09:00:00Z")
-            to_date: Filter charges until this date (ISO 8601 format, e.g., "2025-11-12T09:00:00Z")
+            state: Filter by charge state using ChargeState enum
+            from_date: Filter charges from this date (datetime object)
+            to_date: Filter charges until this date (datetime object)
             page: The page number to retrieve (0-indexed). Defaults to 0.
             per_page: The number of charges per page. Defaults to 10.
 
@@ -179,11 +178,11 @@ class MontaApiClient:
         params = [f"chargePointId={charge_point_id}", f"page={page}", f"perPage={per_page}"]
 
         if state is not None:
-            params.append(f"state={state}")
+            params.append(f"state={state.value}")
         if from_date is not None:
-            params.append(f"fromDate={from_date}")
+            params.append(f"fromDate={from_date.isoformat()}")
         if to_date is not None:
-            params.append(f"toDate={to_date}")
+            params.append(f"toDate={to_date.isoformat()}")
 
         query_string = "&".join(params)
 

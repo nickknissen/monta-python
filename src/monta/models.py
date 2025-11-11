@@ -4,7 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
+
+
+class ChargeState(str, Enum):
+    """Valid charge state values for filtering charges."""
+
+    RESERVED = "reserved"
+    STARTING = "starting"
+    CHARGING = "charging"
+    STOPPING = "stopping"
+    PAUSED = "paused"
+    SCHEDULED = "scheduled"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
 
 
 @dataclass

@@ -163,7 +163,8 @@ class MontaApiClient:
 
         Args:
             charge_point_id: The ID of the charge point
-            state: Filter by charge state (e.g., "starting", "charging", "completed")
+            state: Filter by charge state. Valid values: "reserved", "starting",
+                "charging", "stopping", "paused", "scheduled", "stopped", "completed"
             from_date: Filter charges from this date (ISO 8601 format, e.g., "2025-11-01T09:00:00Z")
             to_date: Filter charges until this date (ISO 8601 format, e.g., "2025-11-12T09:00:00Z")
             page: The page number to retrieve (0-indexed). Defaults to 0.

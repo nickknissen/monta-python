@@ -124,8 +124,14 @@ class MontaApiClient:
 
         return token_response
 
-    async def async_get_charge_points(self) -> dict[int, ChargePoint]:
+    async def async_get_charge_points(
+        self, page: int = 0, per_page: int = 10
+    ) -> dict[int, ChargePoint]:
         """Get available charge points for the user.
+
+        Args:
+            page: The page number to retrieve (0-indexed). Defaults to 0.
+            per_page: The number of charge points per page. Defaults to 10.
 
         Returns:
             A dictionary mapping charge point IDs to ChargePoint objects.
@@ -134,7 +140,7 @@ class MontaApiClient:
 
         response = await self._api_wrapper(
             method="get",
-            path="charge-points?page=0&perPage=10",
+            path=f"charge-points?page={page}&perPage={per_page}",
             headers={"authorization": f"Bearer {access_token}"},
         )
 

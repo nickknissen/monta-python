@@ -12,6 +12,8 @@ class Currency:
     """Represents currency information."""
 
     identifier: str
+    name: str
+    decimals: int = 2
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> Currency | None:
@@ -20,6 +22,8 @@ class Currency:
             return None
         return cls(
             identifier=data.get("identifier", ""),
+            name=data.get("name", ""),
+            decimals=data.get("decimals", 2),
         )
 
 
@@ -44,16 +48,21 @@ class Balance:
 @dataclass
 class Wallet:
     """Represents a personal wallet."""
-
+    id: int
+    owner_type: str
     balance: Balance | None
     currency: Currency | None
+    status: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Wallet:
         """Create a Wallet from a dictionary."""
         return cls(
+            id=data.get("id", 0),
+            owner_type=data.get("ownerType", ""),
             balance=Balance.from_dict(data.get("balance")),
             currency=Currency.from_dict(data.get("currency")),
+            status=data.get("status", ""),
         )
 
 
@@ -150,6 +159,16 @@ class WalletTransaction:
 
     id: int
     state: str
+    summary: str
+    from_amount: float
+    from_currency: Currency | None
+    to_amount: float
+    to_currency: Currency | None
+    exchange_rate: float
+    note: str | None = None
+    from_wallet_id: int | None = None
+    to_wallet_id: int | None = None
+    charge_id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     completed_at: datetime | None = None
@@ -160,6 +179,16 @@ class WalletTransaction:
         return cls(
             id=data["id"],
             state=data.get("state", ""),
+            summary=data.get("summary", ""),
+            note=data.get("note"),
+            from_amount=data.get("fromAmount", 0.0),
+            from_currency=Currency.from_dict(data.get("fromCurrency")),
+            from_wallet_id=data.get("fromWalletId"),
+            to_amount=data.get("toAmount", 0.0),
+            to_currency=Currency.from_dict(data.get("toCurrency")),
+            to_wallet_id=data.get("toWalletId"),
+            charge_id=data.get("chargeId"),
+            exchange_rate=data.get("exchangeRate", 1.0),
             created_at=_parse_datetime(data.get("createdAt")),
             updated_at=_parse_datetime(data.get("updatedAt")),
             completed_at=_parse_datetime(data.get("completedAt")),
@@ -170,6 +199,24 @@ class WalletTransaction:
         return {
             "id": self.id,
             "state": self.state,
+            "summary": self.summary,
+            "note": self.note,
+            "fromAmount": self.from_amount,
+            "fromCurrency": {
+                "identifier": self.from_currency.identifier,
+                "name": self.from_currency.name,
+                "decimals": self.from_currency.decimals,
+            } if self.from_currency else None,
+            "fromWalletId": self.from_wallet_id,
+            "toAmount": self.to_amount,
+            "toCurrency": {
+                "identifier": self.to_currency.identifier,
+                "name": self.to_currency.name,
+                "decimals": self.to_currency.decimals,
+            } if self.to_currency else None,
+            "toWalletId": self.to_wallet_id,
+            "chargeId": self.charge_id,
+            "exchangeRate": self.exchange_rate,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,

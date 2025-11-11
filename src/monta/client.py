@@ -111,7 +111,7 @@ class MontaApiClient:
 
         return TokenResponse.from_dict(response_json)
 
-    async def async_authenticate(self) -> str:
+    async def async_authenticate(self) -> TokenResponse:
         """Obtain access token and store it."""
         token_response = await self.async_request_token()
 
@@ -122,7 +122,7 @@ class MontaApiClient:
             token_response.refresh_token_expiration_date,
         )
 
-        return token_response.access_token
+        return token_response
 
     async def async_get_charge_points(self) -> dict[int, ChargePoint]:
         """Get available charge points for the user.
@@ -295,7 +295,9 @@ class MontaApiClient:
                 return token_response.access_token
 
             _LOGGER.debug("No token is valid, requesting new tokens")
-            return await self.async_authenticate()
+            response = await self.async_authenticate()
+
+            return response.access_token
 
     def _filter_private_information(self, data: Any) -> Any:
         """Filter private information from data for logging."""

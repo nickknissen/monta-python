@@ -150,20 +150,45 @@ class MontaApiClient:
             if item.get("serialNumber") is not None
         }
 
-    async def async_get_charges(self, charge_point_id: int) -> list[Charge]:
+    async def async_get_charges(
+        self,
+        charge_point_id: int,
+        state: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        page: int = 0,
+        per_page: int = 10,
+    ) -> list[Charge]:
         """Retrieve a list of charges for a specific charge point.
 
         Args:
             charge_point_id: The ID of the charge point
+            state: Filter by charge state (e.g., "starting", "charging", "completed")
+            from_date: Filter charges from this date (ISO 8601 format, e.g., "2025-11-01T09:00:00Z")
+            to_date: Filter charges until this date (ISO 8601 format, e.g., "2025-11-12T09:00:00Z")
+            page: The page number to retrieve (0-indexed). Defaults to 0.
+            per_page: The number of charges per page. Defaults to 10.
 
         Returns:
             A list of Charge objects, sorted by ID (most recent first).
         """
         access_token = await self.async_get_access_token()
 
+        # Build query parameters
+        params = [f"chargePointId={charge_point_id}", f"page={page}", f"perPage={per_page}"]
+
+        if state is not None:
+            params.append(f"state={state}")
+        if from_date is not None:
+            params.append(f"fromDate={from_date}")
+        if to_date is not None:
+            params.append(f"toDate={to_date}")
+
+        query_string = "&".join(params)
+
         response = await self._api_wrapper(
             method="get",
-            path=f"charges?chargePointId={charge_point_id}",
+            path=f"charges?{query_string}",
             headers={"authorization": f"Bearer {access_token}"},
         )
 

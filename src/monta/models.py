@@ -30,6 +30,31 @@ class WalletTransactionState(str, Enum):
     RESERVED = "reserved"
 
 
+class SOCSource(str, Enum):
+    """Source of state of charge value."""
+
+    CHARGE_POINT = "charge-point"
+    VEHICLE = "vehicle"
+
+
+@dataclass
+class SOC:
+    """Represents state of charge information."""
+
+    percentage: float
+    source: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> SOC | None:
+        """Create a SOC from a dictionary."""
+        if not data:
+            return None
+        return cls(
+            percentage=data.get("percentage", 0.0),
+            source=data.get("source", ""),
+        )
+
+
 @dataclass
 class Currency:
     """Represents currency information."""
@@ -94,7 +119,25 @@ class Charge:
     """Represents a charging session."""
 
     id: int
+    charge_point_id: int
     state: str
+    human_readable_id: str
+    consumed_kwh: float | None = None
+    start_meter_kwh: float | None = None
+    end_meter_kwh: float | None = None
+    cost: float | None = None
+    price: float | None = None
+    average_price_per_kwh: float | None = None
+    average_co2_per_kwh: float | None = None
+    average_renewable_per_kwh: float | None = None
+    kwh_limit: float | None = None
+    price_limit: float | None = None
+    soc: SOC | None = None
+    soc_limit: float | None = None
+    failure_reason: str | None = None
+    stop_reason: str | None = None
+    note: str | None = None
+    currency: Currency | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     started_at: datetime | None = None
@@ -109,7 +152,25 @@ class Charge:
         """Create a Charge from a dictionary."""
         return cls(
             id=data["id"],
+            charge_point_id=data.get("chargePointId", 0),
             state=data.get("state", ""),
+            human_readable_id=data.get("humanReadableId", ""),
+            consumed_kwh=data.get("consumedKwh"),
+            start_meter_kwh=data.get("startMeterKwh"),
+            end_meter_kwh=data.get("endMeterKwh"),
+            cost=data.get("cost"),
+            price=data.get("price"),
+            average_price_per_kwh=data.get("averagePricePerKwh"),
+            average_co2_per_kwh=data.get("averageCo2PerKwh"),
+            average_renewable_per_kwh=data.get("averageRenewablePerKwh"),
+            kwh_limit=data.get("kwhLimit"),
+            price_limit=data.get("priceLimit"),
+            soc=SOC.from_dict(data.get("soc")),
+            soc_limit=data.get("socLimit"),
+            failure_reason=data.get("failureReason"),
+            stop_reason=data.get("stopReason"),
+            note=data.get("note"),
+            currency=Currency.from_dict(data.get("currency")),
             created_at=_parse_datetime(data.get("createdAt")),
             updated_at=_parse_datetime(data.get("updatedAt")),
             started_at=_parse_datetime(data.get("startedAt")),
@@ -122,9 +183,25 @@ class Charge:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert Charge to a dictionary for compatibility."""
-        return {
+        result = {
             "id": self.id,
+            "chargePointId": self.charge_point_id,
             "state": self.state,
+            "humanReadableId": self.human_readable_id,
+            "consumedKwh": self.consumed_kwh,
+            "startMeterKwh": self.start_meter_kwh,
+            "endMeterKwh": self.end_meter_kwh,
+            "cost": self.cost,
+            "price": self.price,
+            "averagePricePerKwh": self.average_price_per_kwh,
+            "averageCo2PerKwh": self.average_co2_per_kwh,
+            "averageRenewablePerKwh": self.average_renewable_per_kwh,
+            "kwhLimit": self.kwh_limit,
+            "priceLimit": self.price_limit,
+            "socLimit": self.soc_limit,
+            "failureReason": self.failure_reason,
+            "stopReason": self.stop_reason,
+            "note": self.note,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "startedAt": self.started_at.isoformat() if self.started_at else None,
@@ -134,6 +211,23 @@ class Charge:
             "failedAt": self.failed_at.isoformat() if self.failed_at else None,
             "timeoutAt": self.timeout_at.isoformat() if self.timeout_at else None,
         }
+
+        # Add SOC if present
+        if self.soc:
+            result["soc"] = {
+                "percentage": self.soc.percentage,
+                "source": self.soc.source,
+            }
+
+        # Add currency if present
+        if self.currency:
+            result["currency"] = {
+                "identifier": self.currency.identifier,
+                "name": self.currency.name,
+                "decimals": self.currency.decimals,
+            }
+
+        return result
 
 
 @dataclass

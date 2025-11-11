@@ -16,6 +16,8 @@ from .models import (
     ChargePoint,
     ChargeState,
     Currency,
+    SOC,
+    SOCSource,
     TokenResponse,
     Wallet,
     WalletTransaction,
@@ -41,9 +43,11 @@ __all__ = [
     "Balance",
     "Currency",
     "WalletTransaction",
+    "SOC",
     # Enums
     "ChargeState",
     "ChargerStatus",
     "WalletStatus",
     "WalletTransactionState",
+    "SOCSource",
 ]

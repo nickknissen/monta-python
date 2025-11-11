@@ -19,6 +19,7 @@ from .models import (
     TokenResponse,
     Wallet,
     WalletTransaction,
+    WalletTransactionState,
 )
 
 __version__ = "0.1.0"
@@ -44,4 +45,5 @@ __all__ = [
     "ChargeState",
     "ChargerStatus",
     "WalletStatus",
+    "WalletTransactionState",
 ]

@@ -21,6 +21,15 @@ class ChargeState(str, Enum):
     COMPLETED = "completed"
 
 
+class WalletTransactionState(str, Enum):
+    """Valid wallet transaction state values for filtering transactions."""
+
+    COMPLETE = "complete"
+    PENDING = "pending"
+    FAILED = "failed"
+    RESERVED = "reserved"
+
+
 @dataclass
 class Currency:
     """Represents currency information."""

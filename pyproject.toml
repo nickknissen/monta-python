@@ -1,7 +1,7 @@
 [project]
 name = "monta"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python client library for the Monta EV charging API"
 readme = "README.md"
 authors = [
     { name = "Nick Nissen", email = "nickknissen@gmail.com" }

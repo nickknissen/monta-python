@@ -231,19 +231,103 @@ class Charge:
 
 
 @dataclass
+class Coordinates:
+    """Represents GPS coordinates."""
+
+    latitude: float
+    longitude: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> Coordinates | None:
+        """Create Coordinates from a dictionary."""
+        if not data:
+            return None
+        return cls(
+            latitude=data.get("latitude", 0.0),
+            longitude=data.get("longitude", 0.0),
+        )
+
+
+@dataclass
+class Address:
+    """Represents a physical address."""
+
+    address1: str
+    city: str
+    zip: str
+    country: str
+    address2: str | None = None
+    address3: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> Address | None:
+        """Create Address from a dictionary."""
+        if not data:
+            return None
+        return cls(
+            address1=data.get("address1", ""),
+            address2=data.get("address2"),
+            address3=data.get("address3"),
+            zip=data.get("zip", ""),
+            city=data.get("city", ""),
+            country=data.get("country", ""),
+        )
+
+
+@dataclass
+class Location:
+    """Represents location information for a charge point."""
+
+    coordinates: Coordinates | None = None
+    address: Address | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> Location | None:
+        """Create Location from a dictionary."""
+        if not data:
+            return None
+        return cls(
+            coordinates=Coordinates.from_dict(data.get("coordinates")),
+            address=Address.from_dict(data.get("address")),
+        )
+
+
+@dataclass
+class Connector:
+    """Represents a connector type available at a charge point."""
+
+    identifier: str
+    name: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Connector:
+        """Create Connector from a dictionary."""
+        return cls(
+            identifier=data.get("identifier", ""),
+            name=data.get("name", ""),
+        )
+
+
+@dataclass
 class ChargePoint:
     """Represents a charge point (charging station)."""
 
     id: int
-    name: str
-    serial_number: str | None
-    type: str
-    state: str
     visibility: str
-    last_meter_reading_kwh: float
-    brand_name: str
-    model_name: str
-    firmware_version: str
+    created_at: datetime
+    updated_at: datetime
+    location: Location
+    connectors: list[Connector]
+    name: str | None = None
+    serial_number: str | None = None
+    type: str | None = None
+    state: str | None = None
+    max_kw: float | None = None
+    note: str | None = None
+    last_meter_reading_kwh: float | None = None
+    brand_name: str | None = None
+    model_name: str | None = None
+    firmware_version: str | None = None
     cable_plugged_in: bool = False
     charges: list[Charge] = field(default_factory=list)
 
@@ -254,18 +338,28 @@ class ChargePoint:
         charges_data = data.get("charges", [])
         charges = [Charge.from_dict(charge) for charge in charges_data] if charges_data else []
 
+        # Parse connectors
+        connectors_data = data.get("connectors", [])
+        connectors = [Connector.from_dict(conn) for conn in connectors_data]
+
         return cls(
             id=data["id"],
-            name=data.get("name", ""),
+            name=data.get("name"),
             serial_number=data.get("serialNumber"),
-            type=data.get("type", ""),
-            state=data.get("state", ""),
+            type=data.get("type"),
+            state=data.get("state"),
             visibility=data.get("visibility", ""),
-            last_meter_reading_kwh=data.get("lastMeterReadingKwh", 0.0),
-            brand_name=data.get("brandName", ""),
-            model_name=data.get("modelName", ""),
-            firmware_version=data.get("firmwareVersion", ""),
+            max_kw=data.get("maxKw"),
+            note=data.get("note"),
+            last_meter_reading_kwh=data.get("lastMeterReadingKwh"),
+            brand_name=data.get("brandName"),
+            model_name=data.get("modelName"),
+            firmware_version=data.get("firmwareVersion"),
             cable_plugged_in=data.get("cablePluggedIn", False),
+            created_at=_parse_datetime(data.get("createdAt")),
+            updated_at=_parse_datetime(data.get("updatedAt")),
+            location=Location.from_dict(data.get("location")),
+            connectors=connectors,
             charges=charges,
         )
 

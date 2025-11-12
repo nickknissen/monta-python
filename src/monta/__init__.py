@@ -11,11 +11,15 @@ from .exceptions import (
     MontaApiClientError,
 )
 from .models import (
+    Address,
     Balance,
     Charge,
     ChargePoint,
     ChargeState,
+    Connector,
+    Coordinates,
     Currency,
+    Location,
     SOC,
     SOCSource,
     TokenResponse,
@@ -44,6 +48,10 @@ __all__ = [
     "Currency",
     "WalletTransaction",
     "SOC",
+    "Coordinates",
+    "Address",
+    "Location",
+    "Connector",
     # Enums
     "ChargeState",
     "ChargerStatus",

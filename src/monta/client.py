@@ -158,6 +158,25 @@ class MontaApiClient:
             if item.get("serialNumber") is not None
         }
 
+    async def async_get_charge_point(self, charge_point_id: int) -> ChargePoint:
+        """Get a specific charge point by ID.
+
+        Args:
+            charge_point_id: The ID of the charge point to retrieve.
+
+        Returns:
+            A ChargePoint object with detailed information.
+        """
+        access_token = await self.async_get_access_token()
+
+        response = await self._api_wrapper(
+            method="get",
+            path=f"charge-points/{charge_point_id}",
+            headers={"authorization": f"Bearer {access_token}"},
+        )
+
+        return ChargePoint.from_dict(response)
+
     async def async_get_charges(
         self,
         charge_point_id: int,

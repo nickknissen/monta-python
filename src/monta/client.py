@@ -24,6 +24,7 @@ from .exceptions import (
     MontaApiClientError,
 )
 from .models import (
+    Application,
     Charge,
     ChargePoint,
     ChargeState,
@@ -131,6 +132,23 @@ class MontaApiClient:
         )
 
         return token_response
+
+    async def async_get_auth_me(self) -> Application:
+        """Retrieve information about the authenticated application.
+
+        Returns:
+            An Application object containing details about the current
+            authenticated application including ID, name, client ID, and scopes.
+        """
+        access_token = await self.async_get_access_token()
+
+        response = await self._api_wrapper(
+            method="get",
+            path="auth/me",
+            headers={"authorization": f"Bearer {access_token}"},
+        )
+
+        return Application.from_dict(response)
 
     async def async_get_charge_points(
         self, page: int = 0, per_page: int = 10

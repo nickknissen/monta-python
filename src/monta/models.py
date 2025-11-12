@@ -341,6 +341,44 @@ class WalletTransaction:
 
 
 @dataclass
+class AuthScope(str, Enum):
+    """Valid authentication scopes."""
+
+    ALL = "all"
+    CHARGE_POINTS = "charge-points"
+    CHARGE_TRANSACTIONS = "charge-transactions"
+    CONTROL_CHARGING = "control-charging"
+
+
+@dataclass
+class Application:
+    """Represents an authenticated application."""
+
+    id: int
+    user_id: int
+    name: str
+    client_id: str
+    scopes: list[str]
+    client_secret: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Application:
+        """Create an Application from a dictionary."""
+        return cls(
+            id=data["id"],
+            user_id=data["userId"],
+            name=data.get("name", ""),
+            client_id=data["clientId"],
+            scopes=data.get("scopes", []),
+            client_secret=data.get("clientSecret"),
+            created_at=_parse_datetime(data.get("createdAt")),
+            updated_at=_parse_datetime(data.get("updatedAt")),
+        )
+
+
+@dataclass
 class TokenResponse:
     """Represents an authentication token response."""
 

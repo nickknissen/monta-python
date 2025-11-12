@@ -11,6 +11,8 @@ from .exceptions import (
     MontaApiClientError,
 )
 from .models import (
+    Application,
+    AuthScope,
     Balance,
     Charge,
     ChargePoint,
@@ -36,6 +38,7 @@ __all__ = [
     "MontaApiClientCommunicationError",
     "MontaApiClientAuthenticationError",
     # Models
+    "Application",
     "TokenResponse",
     "ChargePoint",
     "Charge",
@@ -45,6 +48,7 @@ __all__ = [
     "WalletTransaction",
     "SOC",
     # Enums
+    "AuthScope",
     "ChargeState",
     "ChargerStatus",
     "WalletStatus",

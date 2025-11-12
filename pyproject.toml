@@ -6,11 +6,29 @@ readme = "README.md"
 authors = [
     { name = "Nick Nissen", email = "nickknissen@gmail.com" }
 ]
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.13.2",
     "async-timeout>=5.0.1",
 ]
+keywords = ["monta", "ev", "charging", "electric-vehicle", "api-client"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/nickknissen/monta-python"
+Repository = "https://github.com/nickknissen/monta-python"
+Documentation = "https://docs.public-api.monta.com/reference/home"
+Issues = "https://github.com/nickknissen/monta-python/issues"
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]

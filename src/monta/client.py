@@ -180,17 +180,18 @@ class MontaApiClient:
 
     async def async_get_charges(
         self,
-        charge_point_id: int,
+        charge_point_id: int | None = None,
         state: ChargeState | None = None,
         from_date: datetime | None = None,
         to_date: datetime | None = None,
         page: int = 0,
         per_page: int = 10,
     ) -> list[Charge]:
-        """Retrieve a list of charges for a specific charge point.
+        """Retrieve a list of charges.
 
         Args:
-            charge_point_id: The ID of the charge point
+            charge_point_id: Optional ID of the charge point to filter by.
+                           If not provided, retrieves charges for all charge points.
             state: Filter by charge state using ChargeState enum
             from_date: Filter charges from this date (datetime object)
             to_date: Filter charges until this date (datetime object)
@@ -203,8 +204,10 @@ class MontaApiClient:
         access_token = await self.async_get_access_token()
 
         # Build query parameters
-        params = [f"chargePointId={charge_point_id}", f"page={page}", f"perPage={per_page}"]
+        params = [f"page={page}", f"perPage={per_page}"]
 
+        if charge_point_id is not None:
+            params.insert(0, f"chargePointId={charge_point_id}")
         if state is not None:
             params.append(f"state={state.value}")
         if from_date is not None:

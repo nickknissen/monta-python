@@ -9,7 +9,7 @@ For complete API documentation, visit the official Monta API docs:
 
 ## Requirements
 
-- Python 3.14 or higher
+- Python 3.11 or higher
 - aiohttp
 - async-timeout
 

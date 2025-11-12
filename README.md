@@ -48,9 +48,20 @@ async def main():
         for charge_point_id, charge_point in charge_points.items():
             print(f"Charge Point {charge_point_id}: {charge_point.name}")
 
-        # Get charges for a specific charge point
+        # Get a specific charge point with full details
         if charge_points:
             first_charge_point_id = next(iter(charge_points.keys()))
+            charge_point = await client.async_get_charge_point(first_charge_point_id)
+
+            # Access location information
+            if charge_point.location and charge_point.location.coordinates:
+                print(f"Location: {charge_point.location.coordinates.latitude}, "
+                      f"{charge_point.location.coordinates.longitude}")
+
+            # Access connector information
+            print(f"Available connectors: {[c.name for c in charge_point.connectors]}")
+
+            # Get charges for this charge point
             charges = await client.async_get_charges(first_charge_point_id)
             print(f"Found {len(charges)} charges")
 
@@ -64,12 +75,13 @@ asyncio.run(main())
 
 ### Available Methods
 
-- `async_get_charge_points()` - Retrieve all available charge points
-- `async_get_charges(charge_point_id)` - Get charges for a specific charge point
+- `async_get_charge_points(page, per_page)` - Retrieve all available charge points with pagination
+- `async_get_charge_point(charge_point_id)` - Get a specific charge point by ID with full details
+- `async_get_charges(charge_point_id, state, from_date, to_date, page, per_page)` - Get charges for a specific charge point
 - `async_start_charge(charge_point_id)` - Start a charging session
 - `async_stop_charge(charge_id)` - Stop a charging session
 - `async_get_personal_wallet()` - Get personal wallet information
-- `async_get_wallet_transactions()` - Retrieve wallet transactions
+- `async_get_wallet_transactions(state, from_date, to_date, page, per_page)` - Retrieve wallet transactions
 
 ## License
 

@@ -23,7 +23,15 @@ from .exceptions import (
     MontaApiClientCommunicationError,
     MontaApiClientError,
 )
-from .models import Charge, ChargePoint, TokenResponse, Wallet, WalletTransaction
+from .models import (
+    Charge,
+    ChargePoint,
+    ChargeState,
+    TokenResponse,
+    Wallet,
+    WalletTransaction,
+    WalletTransactionState,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,8 +132,14 @@ class MontaApiClient:
 
         return token_response
 
-    async def async_get_charge_points(self) -> dict[int, ChargePoint]:
+    async def async_get_charge_points(
+        self, page: int = 0, per_page: int = 10
+    ) -> dict[int, ChargePoint]:
         """Get available charge points for the user.
+
+        Args:
+            page: The page number to retrieve (0-indexed). Defaults to 0.
+            per_page: The number of charge points per page. Defaults to 10.
 
         Returns:
             A dictionary mapping charge point IDs to ChargePoint objects.
@@ -134,7 +148,7 @@ class MontaApiClient:
 
         response = await self._api_wrapper(
             method="get",
-            path="charge-points?page=0&perPage=10",
+            path=f"charge-points?page={page}&perPage={per_page}",
             headers={"authorization": f"Bearer {access_token}"},
         )
 
@@ -144,20 +158,45 @@ class MontaApiClient:
             if item.get("serialNumber") is not None
         }
 
-    async def async_get_charges(self, charge_point_id: int) -> list[Charge]:
+    async def async_get_charges(
+        self,
+        charge_point_id: int,
+        state: ChargeState | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        page: int = 0,
+        per_page: int = 10,
+    ) -> list[Charge]:
         """Retrieve a list of charges for a specific charge point.
 
         Args:
             charge_point_id: The ID of the charge point
+            state: Filter by charge state using ChargeState enum
+            from_date: Filter charges from this date (datetime object)
+            to_date: Filter charges until this date (datetime object)
+            page: The page number to retrieve (0-indexed). Defaults to 0.
+            per_page: The number of charges per page. Defaults to 10.
 
         Returns:
             A list of Charge objects, sorted by ID (most recent first).
         """
         access_token = await self.async_get_access_token()
 
+        # Build query parameters
+        params = [f"chargePointId={charge_point_id}", f"page={page}", f"perPage={per_page}"]
+
+        if state is not None:
+            params.append(f"state={state.value}")
+        if from_date is not None:
+            params.append(f"fromDate={from_date.isoformat()}")
+        if to_date is not None:
+            params.append(f"toDate={to_date.isoformat()}")
+
+        query_string = "&".join(params)
+
         response = await self._api_wrapper(
             method="get",
-            path=f"charges?chargePointId={charge_point_id}",
+            path=f"charges?{query_string}",
             headers={"authorization": f"Bearer {access_token}"},
         )
 
@@ -170,14 +209,14 @@ class MontaApiClient:
         charge_objects = [Charge.from_dict(charge) for charge in charges]
         return sorted(charge_objects, key=lambda charge: -charge.id)
 
-    async def async_start_charge(self, charge_point_id: int) -> Any:
+    async def async_start_charge(self, charge_point_id: int) -> Charge:
         """Start a charge on the specified charge point.
 
         Args:
             charge_point_id: The ID of the charge point to start charging on
 
         Returns:
-            The API response data.
+            A Charge object representing the started charging session.
         """
         access_token = await self.async_get_access_token()
 
@@ -192,16 +231,16 @@ class MontaApiClient:
 
         _LOGGER.debug("Started a charge on: %s", charge_point_id)
 
-        return response
+        return Charge.from_dict(response)
 
-    async def async_stop_charge(self, charge_id: int) -> Any:
+    async def async_stop_charge(self, charge_id: int) -> Charge:
         """Stop a charge.
 
         Args:
             charge_id: The ID of the charge to stop
 
         Returns:
-            The API response data.
+            A Charge object representing the stopped charging session.
         """
         access_token = await self.async_get_access_token()
 
@@ -213,21 +252,47 @@ class MontaApiClient:
             headers={"authorization": f"Bearer {access_token}"},
         )
 
-        _LOGGER.debug("Stopped charge for chargeId: %s <%s>", charge_id, response)
+        _LOGGER.debug("Stopped charge for chargeId: %s", charge_id)
 
-        return response
+        return Charge.from_dict(response)
 
-    async def async_get_wallet_transactions(self) -> list[WalletTransaction]:
-        """Retrieve first page of wallet transactions.
+    async def async_get_wallet_transactions(
+        self,
+        state: WalletTransactionState | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        page: int = 0,
+        per_page: int = 10,
+    ) -> list[WalletTransaction]:
+        """Retrieve wallet transactions with optional filtering and pagination.
+
+        Args:
+            state: Filter by transaction state using WalletTransactionState enum
+            from_date: Filter transactions from this date (datetime object)
+            to_date: Filter transactions until this date (datetime object)
+            page: The page number to retrieve (0-indexed). Defaults to 0.
+            per_page: The number of transactions per page. Defaults to 10.
 
         Returns:
             A list of WalletTransaction objects, sorted by ID (most recent first).
         """
         access_token = await self.async_get_access_token()
 
+        # Build query parameters
+        params = [f"page={page}", f"perPage={per_page}"]
+
+        if state is not None:
+            params.append(f"state={state.value}")
+        if from_date is not None:
+            params.append(f"fromDate={from_date.isoformat()}")
+        if to_date is not None:
+            params.append(f"toDate={to_date.isoformat()}")
+
+        query_string = "&".join(params)
+
         response = await self._api_wrapper(
             method="get",
-            path="wallet-transactions",
+            path=f"wallet-transactions?{query_string}",
             headers={"authorization": f"Bearer {access_token}"},
         )
 

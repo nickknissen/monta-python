@@ -14,10 +14,14 @@ from .models import (
     Balance,
     Charge,
     ChargePoint,
+    ChargeState,
     Currency,
+    SOC,
+    SOCSource,
     TokenResponse,
     Wallet,
     WalletTransaction,
+    WalletTransactionState,
 )
 
 __version__ = "0.1.0"
@@ -39,7 +43,11 @@ __all__ = [
     "Balance",
     "Currency",
     "WalletTransaction",
+    "SOC",
     # Enums
+    "ChargeState",
     "ChargerStatus",
     "WalletStatus",
+    "WalletTransactionState",
+    "SOCSource",
 ]

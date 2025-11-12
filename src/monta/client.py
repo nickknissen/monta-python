@@ -123,12 +123,13 @@ class MontaApiClient:
         """Obtain access token and store it."""
         token_response = await self.async_request_token()
 
-        await self._async_update_token_data(
-            token_response.access_token,
-            token_response.access_token_expiration_date,
-            token_response.refresh_token,
-            token_response.refresh_token_expiration_date,
-        )
+        async with self._get_token_lock:
+            await self._async_update_token_data(
+                token_response.access_token,
+                token_response.access_token_expiration_date,
+                token_response.refresh_token,
+                token_response.refresh_token_expiration_date,
+            )
 
         return token_response
 
@@ -350,16 +351,15 @@ class MontaApiClient:
             MontaApiClientAuthenticationError: If authentication fails.
         """
         async with self._get_token_lock:
-            if self._token_data is None:
-                await self._async_load_token_data()
+            token_data = await self._ensure_token_data_loaded()
 
-            if self._is_access_token_valid():
+            if self._is_access_token_valid(token_data):
                 _LOGGER.debug("Access Token still valid, using it")
-                return self._token_data["access_token"]
+                return token_data["access_token"]
 
-            if self._is_refresh_token_valid():
+            if self._is_refresh_token_valid(token_data):
                 _LOGGER.debug("Refresh Token still valid, using it")
-                params = {"refreshToken": self._token_data["refresh_token"]}
+                params = {"refreshToken": token_data["refresh_token"]}
 
                 response_json = await self._api_wrapper(
                     path="auth/refresh",
@@ -478,38 +478,53 @@ class MontaApiClient:
         refresh_token_expiration: datetime | None,
     ) -> None:
         """Update token data in storage."""
-        if self._token_data is None:
-            await self._async_load_token_data()
+        token_data = await self._ensure_token_data_loaded()
 
         if access_token is not None:
-            self._token_data["access_token"] = access_token
+            token_data["access_token"] = access_token
         if access_token_expiration is not None:
-            self._token_data["access_token_expiration"] = access_token_expiration.isoformat()
+            token_data["access_token_expiration"] = access_token_expiration.isoformat()
         if refresh_token is not None:
-            self._token_data["refresh_token"] = refresh_token
+            token_data["refresh_token"] = refresh_token
         if refresh_token_expiration is not None:
-            self._token_data["refresh_token_expiration"] = refresh_token_expiration.isoformat()
+            token_data["refresh_token_expiration"] = refresh_token_expiration.isoformat()
 
-        await self._token_storage.save(self._token_data)
+        await self._token_storage.save(token_data)
 
     async def _async_load_token_data(self) -> None:
         """Load token data from storage."""
-        self._token_data = await self._token_storage.load()
+        stored_data = await self._token_storage.load()
+        if stored_data is None:
+            self._token_data = self._create_empty_token_data()
+        else:
+            self._token_data = stored_data
+
+    async def _ensure_token_data_loaded(self) -> dict[str, Any]:
+        """Ensure token data is loaded before use."""
+        if self._token_data is None:
+            await self._async_load_token_data()
 
         if self._token_data is None:
-            self._token_data = {
-                "access_token": None,
-                "refresh_token": None,
-                "access_token_expiration": None,
-                "refresh_token_expiration": None,
-            }
+            self._token_data = self._create_empty_token_data()
 
-    def _is_access_token_valid(self) -> bool:
+        return self._token_data
+
+    @staticmethod
+    def _create_empty_token_data() -> dict[str, Any]:
+        """Return a default token data structure."""
+        return {
+            "access_token": None,
+            "refresh_token": None,
+            "access_token_expiration": None,
+            "refresh_token_expiration": None,
+        }
+
+    def _is_access_token_valid(self, token_data: dict[str, Any] | None) -> bool:
         """Check if the access token is still valid."""
-        if not self._token_data or not self._token_data.get("access_token"):
+        if not token_data or not token_data.get("access_token"):
             return False
 
-        expiration = self._token_data.get("access_token_expiration")
+        expiration = token_data.get("access_token_expiration")
         if expiration is None:
             return False
 
@@ -522,12 +537,12 @@ class MontaApiClient:
 
         return datetime.now(timezone.utc) < preemptive_expire_time
 
-    def _is_refresh_token_valid(self) -> bool:
+    def _is_refresh_token_valid(self, token_data: dict[str, Any] | None) -> bool:
         """Check if the refresh token is still valid."""
-        if not self._token_data or not self._token_data.get("refresh_token"):
+        if not token_data or not token_data.get("refresh_token"):
             return False
 
-        expiration = self._token_data.get("refresh_token_expiration")
+        expiration = token_data.get("refresh_token_expiration")
         if expiration is None:
             return False
 

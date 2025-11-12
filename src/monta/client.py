@@ -382,7 +382,16 @@ class MontaApiClient:
                 return token_response.access_token
 
             _LOGGER.debug("No token is valid, requesting new tokens")
-            response = await self.async_authenticate()
+            # Call async_request_token directly to avoid deadlock
+            # (we already hold self._get_token_lock here)
+            response = await self.async_request_token()
+
+            await self._async_update_token_data(
+                response.access_token,
+                response.access_token_expiration_date,
+                response.refresh_token,
+                response.refresh_token_expiration_date,
+            )
 
             return response.access_token
 

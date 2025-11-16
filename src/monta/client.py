@@ -211,9 +211,13 @@ class MontaApiClient:
         if state is not None:
             params.append(f"state={state.value}")
         if from_date is not None:
-            params.append(f"fromDate={from_date.isoformat()}")
+            # Convert to UTC and format as ISO8601 with Z suffix
+            utc_from = from_date.astimezone(timezone.utc)
+            params.append(f"fromDate={utc_from.strftime('%Y-%m-%dT%H:%M:%SZ')}")
         if to_date is not None:
-            params.append(f"toDate={to_date.isoformat()}")
+            # Convert to UTC and format as ISO8601 with Z suffix
+            utc_to = to_date.astimezone(timezone.utc)
+            params.append(f"toDate={utc_to.strftime('%Y-%m-%dT%H:%M:%SZ')}")
 
         query_string = "&".join(params)
 
@@ -307,9 +311,13 @@ class MontaApiClient:
         if state is not None:
             params.append(f"state={state.value}")
         if from_date is not None:
-            params.append(f"fromDate={from_date.isoformat()}")
+            # Convert to UTC and format as ISO8601 with Z suffix
+            utc_from = from_date.astimezone(timezone.utc)
+            params.append(f"fromDate={utc_from.strftime('%Y-%m-%dT%H:%M:%SZ')}")
         if to_date is not None:
-            params.append(f"toDate={to_date.isoformat()}")
+            # Convert to UTC and format as ISO8601 with Z suffix
+            utc_to = to_date.astimezone(timezone.utc)
+            params.append(f"toDate={utc_to.strftime('%Y-%m-%dT%H:%M:%SZ')}")
 
         query_string = "&".join(params)
 

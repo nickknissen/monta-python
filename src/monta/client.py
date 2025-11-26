@@ -10,7 +10,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import aiohttp
-import async_timeout
 
 from .const import (
     API_BASE_URL,
@@ -451,7 +450,7 @@ class MontaApiClient:
         all_headers = {**default_headers, **(headers or {})}
 
         try:
-            async with async_timeout.timeout(DEFAULT_TIMEOUT):
+            async with asyncio.timeout(DEFAULT_TIMEOUT):
                 response = await self._session.request(
                     method=method,
                     url=f"{API_BASE_URL}{path}",

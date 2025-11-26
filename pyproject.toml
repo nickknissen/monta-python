@@ -1,6 +1,6 @@
 [project]
 name = "monta"
-version = "0.1.0"
+version = "1.0.4"
 description = "Python client library for the Monta EV charging API"
 readme = "README.md"
 authors = [
@@ -10,7 +10,6 @@ license = {file = "LICENSE"}
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.13.2",
-    "async-timeout>=5.0.1",
 ]
 keywords = ["monta", "ev", "charging", "electric-vehicle", "api-client"]
 classifiers = [

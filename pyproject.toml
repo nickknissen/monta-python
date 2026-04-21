@@ -1,6 +1,6 @@
 [project]
 name = "monta"
-version = "1.0.4"
+version = "1.0.5"
 description = "Python client library for the Monta EV charging API"
 readme = "README.md"
 authors = [

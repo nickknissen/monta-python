@@ -30,5 +30,5 @@ Documentation = "https://docs.public-api.monta.com/reference/home"
 Issues = "https://github.com/nickknissen/monta-python/issues"
 
 [build-system]
-requires = ["uv_build>=0.9.7,<0.10.0"]
+requires = ["uv_build>=0.9.7,<0.12.0"]
 build-backend = "uv_build"

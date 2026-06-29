@@ -9,6 +9,7 @@ from .exceptions import (
     MontaApiClientAuthenticationError,
     MontaApiClientCommunicationError,
     MontaApiClientError,
+    MontaApiClientRateLimitError,
 )
 from .models import (
     Address,
@@ -39,6 +40,7 @@ __all__ = [
     "MontaApiClientError",
     "MontaApiClientCommunicationError",
     "MontaApiClientAuthenticationError",
+    "MontaApiClientRateLimitError",
     # Models
     "TokenResponse",
     "ChargePoint",

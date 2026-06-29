@@ -21,6 +21,7 @@ from .exceptions import (
     MontaApiClientAuthenticationError,
     MontaApiClientCommunicationError,
     MontaApiClientError,
+    MontaApiClientRateLimitError,
 )
 from .models import (
     Charge,
@@ -465,6 +466,13 @@ class MontaApiClient:
                     raise MontaApiClientAuthenticationError(
                         "Invalid credentials",
                     )
+                if response.status == 429:
+                    raise MontaApiClientRateLimitError(
+                        "Rate limit exceeded",
+                        retry_after=self._parse_retry_after(
+                            response.headers.get("Retry-After")
+                        ),
+                    )
                 response.raise_for_status()
                 response_json = await response.json()
 
@@ -484,10 +492,25 @@ class MontaApiClient:
             raise MontaApiClientCommunicationError(
                 "Error fetching information",
             ) from exception
-        except MontaApiClientAuthenticationError:
+        except (MontaApiClientAuthenticationError, MontaApiClientRateLimitError):
             raise
         except Exception as exception:
             raise MontaApiClientError("Something really wrong happened!") from exception
+
+    @staticmethod
+    def _parse_retry_after(value: str | None) -> int | None:
+        """Parse a ``Retry-After`` header value into seconds.
+
+        Monta sends a delta-seconds value; only that form is supported here.
+        Returns ``None`` when the header is absent or not a plain integer
+        (e.g. an HTTP-date), leaving the backoff decision to the caller.
+        """
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
 
     async def _async_update_token_data(
         self,

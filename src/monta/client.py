@@ -159,6 +159,53 @@ class MontaApiClient:
             if item.get("serialNumber") is not None
         }
 
+    async def async_get_all_charge_points(
+        self, per_page: int = 100
+    ) -> dict[int, ChargePoint]:
+        """Get all charge points for the user, following pagination.
+
+        Unlike :meth:`async_get_charge_points`, which returns a single page
+        (10 items by default), this method walks every page reported by the
+        response ``meta.totalPageCount`` so accounts with more charge points
+        than one page holds are fully represented.
+
+        Args:
+            per_page: The number of charge points requested per page.
+                Defaults to 100 (the API maximum); the API may cap it lower,
+                in which case additional pages are fetched as needed.
+
+        Returns:
+            A dictionary mapping charge point IDs to ChargePoint objects
+            across all pages.
+        """
+        access_token = await self.async_get_access_token()
+
+        charge_points: dict[int, ChargePoint] = {}
+        page = 0
+        while True:
+            response = await self._api_wrapper(
+                method="get",
+                path=f"charge-points?page={page}&perPage={per_page}",
+                headers={"authorization": f"Bearer {access_token}"},
+            )
+
+            data = response.get("data") or []
+            charge_points.update(
+                {
+                    item["id"]: ChargePoint.from_dict(item)
+                    for item in data
+                    if item.get("serialNumber") is not None
+                }
+            )
+
+            meta = response.get("meta") or {}
+            total_page_count = meta.get("totalPageCount", 0)
+            page += 1
+            if page >= total_page_count or not data:
+                break
+
+        return charge_points
+
     async def async_get_charge_point(self, charge_point_id: int) -> ChargePoint:
         """Get a specific charge point by ID.
 

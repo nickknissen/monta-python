@@ -108,6 +108,11 @@ class MontaApiClient:
         self._token_storage = token_storage or InMemoryTokenStorage()
         self._token_data: dict[str, Any] | None = None
         self._get_token_lock = asyncio.Lock()
+        # Counts the token sets this client has stored. A request notes the
+        # generation its token came from, so that when several are refused at
+        # once they can tell "nobody has replaced these tokens yet" from
+        # "somebody already did while I was waiting".
+        self._token_generation = 0
 
     async def async_request_token(self) -> TokenResponse:
         """Obtain access token with clientId and secret."""
@@ -145,12 +150,9 @@ class MontaApiClient:
         Returns:
             A dictionary mapping charge point IDs to ChargePoint objects.
         """
-        access_token = await self.async_get_access_token()
-
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="get",
             path=f"charge-points?page={page}&perPage={per_page}",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         return {
@@ -178,15 +180,12 @@ class MontaApiClient:
             A dictionary mapping charge point IDs to ChargePoint objects
             across all pages.
         """
-        access_token = await self.async_get_access_token()
-
         charge_points: dict[int, ChargePoint] = {}
         page = 0
         while True:
-            response = await self._api_wrapper(
+            response = await self._async_authorized_request(
                 method="get",
                 path=f"charge-points?page={page}&perPage={per_page}",
-                headers={"authorization": f"Bearer {access_token}"},
             )
 
             data = response.get("data") or []
@@ -215,12 +214,9 @@ class MontaApiClient:
         Returns:
             A ChargePoint object with detailed information.
         """
-        access_token = await self.async_get_access_token()
-
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="get",
             path=f"charge-points/{charge_point_id}",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         return ChargePoint.from_dict(response)
@@ -248,8 +244,6 @@ class MontaApiClient:
         Returns:
             A list of Charge objects, sorted by ID (most recent first).
         """
-        access_token = await self.async_get_access_token()
-
         # Build query parameters
         params = [f"page={page}", f"perPage={per_page}"]
 
@@ -268,10 +262,9 @@ class MontaApiClient:
 
         query_string = "&".join(params)
 
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="get",
             path=f"charges?{query_string}",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         charges = response.get("data")
@@ -292,14 +285,11 @@ class MontaApiClient:
         Returns:
             A Charge object representing the started charging session.
         """
-        access_token = await self.async_get_access_token()
-
         _LOGGER.debug("Trying to start a charge on: %s", charge_point_id)
 
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="post",
             path="charges",
-            headers={"authorization": f"Bearer {access_token}"},
             data={"chargePointId": charge_point_id},
         )
 
@@ -316,14 +306,11 @@ class MontaApiClient:
         Returns:
             A Charge object representing the stopped charging session.
         """
-        access_token = await self.async_get_access_token()
-
         _LOGGER.debug("Trying to stop a charge with id: %s", charge_id)
 
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="post",
             path=f"charges/{charge_id}/stop",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         _LOGGER.debug("Stopped charge for chargeId: %s", charge_id)
@@ -350,8 +337,6 @@ class MontaApiClient:
         Returns:
             A list of WalletTransaction objects, sorted by ID (most recent first).
         """
-        access_token = await self.async_get_access_token()
-
         # Build query parameters
         params = [f"page={page}", f"perPage={per_page}"]
 
@@ -368,10 +353,9 @@ class MontaApiClient:
 
         query_string = "&".join(params)
 
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="get",
             path=f"wallet-transactions?{query_string}",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         transactions = response.get("data")
@@ -389,12 +373,9 @@ class MontaApiClient:
         Returns:
             A Wallet object containing balance and currency information.
         """
-        access_token = await self.async_get_access_token()
-
-        response = await self._api_wrapper(
+        response = await self._async_authorized_request(
             method="get",
             path="wallets/personal",
-            headers={"authorization": f"Bearer {access_token}"},
         )
 
         return Wallet.from_dict(response)
@@ -419,22 +400,33 @@ class MontaApiClient:
                 _LOGGER.debug("Refresh Token still valid, using it")
                 params = {"refreshToken": token_data["refresh_token"]}
 
-                response_json = await self._api_wrapper(
-                    path="auth/refresh",
-                    method="post",
-                    data=params,
-                )
+                try:
+                    response_json = await self._api_wrapper(
+                        path="auth/refresh",
+                        method="post",
+                        data=params,
+                    )
+                except MontaApiClientAuthenticationError:
+                    # Refresh tokens rotate, and the stored one can be out of
+                    # date or revoked while the client id and secret remain
+                    # perfectly good. Falling back to them keeps the caller
+                    # from having to ask the user for credentials that were
+                    # never the problem.
+                    _LOGGER.debug(
+                        "Refresh token was refused, falling back to the "
+                        "client credentials"
+                    )
+                else:
+                    token_response = TokenResponse.from_dict(response_json)
 
-                token_response = TokenResponse.from_dict(response_json)
+                    await self._async_update_token_data(
+                        token_response.access_token,
+                        token_response.access_token_expiration_date,
+                        token_response.refresh_token,
+                        token_response.refresh_token_expiration_date,
+                    )
 
-                await self._async_update_token_data(
-                    token_response.access_token,
-                    token_response.access_token_expiration_date,
-                    token_response.refresh_token,
-                    token_response.refresh_token_expiration_date,
-                )
-
-                return token_response.access_token
+                    return token_response.access_token
 
             _LOGGER.debug("No token is valid, requesting new tokens")
             # Call async_request_token directly to avoid deadlock
@@ -449,6 +441,89 @@ class MontaApiClient:
             )
 
             return response.access_token
+
+    async def _async_authorized_request(
+        self,
+        method: str,
+        path: str,
+        data: dict | None = None,
+    ) -> Any:
+        """Make a bearer token request, replacing a token the API refuses.
+
+        Whether an access token is still good is judged here, against the
+        expiry the API reported and this machine's clock, so the API can
+        refuse one this client still believes in: the clocks can disagree, or
+        the token can be revoked ahead of its expiry. Surfacing that as an
+        authentication error would be misleading, since the credentials are
+        fine, so the token is replaced and the request tried once more.
+
+        Only a refused token is retried, which is safe for the requests that
+        start and stop a charge: the API turned those down before acting on
+        them, so the retry is the first one to take effect.
+
+        Args:
+            method: HTTP method (get, post, etc.)
+            path: API endpoint path
+            data: Optional request body data
+
+        Returns:
+            The JSON response from the API.
+
+        Raises:
+            MontaApiClientAuthenticationError: If the replacement token is
+                refused as well, or if the credentials no longer work.
+        """
+        access_token = await self.async_get_access_token()
+        # Read after the token is in hand, so this records the generation the
+        # token being sent belongs to. Reading it earlier would miss the case
+        # where the call above did the minting.
+        generation = self._token_generation
+
+        try:
+            return await self._api_wrapper(
+                method=method,
+                path=path,
+                headers={"authorization": f"Bearer {access_token}"},
+                data=data,
+            )
+        except MontaApiClientAuthenticationError:
+            _LOGGER.debug("[%s] Access token was refused, replacing it", path)
+
+        access_token = await self._async_replace_access_token(generation)
+
+        return await self._api_wrapper(
+            method=method,
+            path=path,
+            headers={"authorization": f"Bearer {access_token}"},
+            data=data,
+        )
+
+    async def _async_replace_access_token(self, generation: int) -> str:
+        """Return an access token minted after the given generation.
+
+        Args:
+            generation: The value of the token generation counter read before
+                the request that was refused.
+
+        Returns:
+            A valid access token.
+        """
+        async with self._get_token_lock:
+            token_data = await self._ensure_token_data_loaded()
+
+            if generation != self._token_generation:
+                # Another request already replaced the tokens this one was
+                # refused with, so there is nothing left to do.
+                _LOGGER.debug("Tokens were already replaced, reusing them")
+                return token_data["access_token"]
+
+            # Discard the refused token so it is not handed out again. The
+            # refresh token is left alone: it is a separate credential and
+            # the API has said nothing about it.
+            token_data["access_token"] = None
+            token_data["access_token_expiration"] = None
+
+        return await self.async_get_access_token()
 
     def _filter_private_information(self, data: Any) -> Any:
         """Filter private information from data for logging."""
@@ -577,6 +652,8 @@ class MontaApiClient:
             token_data["refresh_token"] = refresh_token
         if refresh_token_expiration is not None:
             token_data["refresh_token_expiration"] = refresh_token_expiration.isoformat()
+
+        self._token_generation += 1
 
         await self._token_storage.save(token_data)
 

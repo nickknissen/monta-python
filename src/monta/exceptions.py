@@ -10,7 +10,18 @@ class MontaApiClientCommunicationError(MontaApiClientError):
 
 
 class MontaApiClientAuthenticationError(MontaApiClientError):
-    """Exception to indicate an authentication error."""
+    """Exception to indicate an authentication error.
+
+    Carries ``status``, the HTTP status the API answered with, so a refused
+    token (401) can be told apart from a request the credentials are not
+    allowed to make (403). Only the former is worth presenting another token
+    for.
+    """
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        """Initialize with the HTTP status the API answered with."""
+        super().__init__(message)
+        self.status = status
 
 
 class MontaApiClientRateLimitError(MontaApiClientError):

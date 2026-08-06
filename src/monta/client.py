@@ -14,6 +14,9 @@ import aiohttp
 from .const import (
     API_BASE_URL,
     DEFAULT_TIMEOUT,
+    HTTP_FORBIDDEN,
+    HTTP_TOO_MANY_REQUESTS,
+    HTTP_UNAUTHORIZED,
     PREEMPTIVE_REFRESH_TTL_IN_SECONDS,
     PRIVATE_INFORMATION,
 )
@@ -406,7 +409,9 @@ class MontaApiClient:
                         method="post",
                         data=params,
                     )
-                except MontaApiClientAuthenticationError:
+                except MontaApiClientAuthenticationError as err:
+                    if err.status != HTTP_UNAUTHORIZED:
+                        raise
                     # Refresh tokens rotate, and the stored one can be out of
                     # date or revoked while the client id and secret remain
                     # perfectly good. Falling back to them keeps the caller
@@ -486,7 +491,11 @@ class MontaApiClient:
                 headers={"authorization": f"Bearer {access_token}"},
                 data=data,
             )
-        except MontaApiClientAuthenticationError:
+        except MontaApiClientAuthenticationError as err:
+            if err.status != HTTP_UNAUTHORIZED:
+                # A 403 turns down the request, not the token it was carrying,
+                # so another token would be turned down in the same way.
+                raise
             _LOGGER.debug("[%s] Access token was refused, replacing it", path)
 
         access_token = await self._async_replace_access_token(generation)
@@ -517,11 +526,7 @@ class MontaApiClient:
                 _LOGGER.debug("Tokens were already replaced, reusing them")
                 return token_data["access_token"]
 
-            # Discard the refused token so it is not handed out again. The
-            # refresh token is left alone: it is a separate credential and
-            # the API has said nothing about it.
-            token_data["access_token"] = None
-            token_data["access_token_expiration"] = None
+            await self._async_discard_access_token()
 
         return await self.async_get_access_token()
 
@@ -584,11 +589,17 @@ class MontaApiClient:
                 _LOGGER.debug("[%s] Response header: %s", path, response.headers)
                 _LOGGER.debug("[%s] Response status: %s", path, response.status)
 
-                if response.status in (401, 403):
+                if response.status == HTTP_UNAUTHORIZED:
                     raise MontaApiClientAuthenticationError(
                         "Invalid credentials",
+                        status=response.status,
                     )
-                if response.status == 429:
+                if response.status == HTTP_FORBIDDEN:
+                    raise MontaApiClientAuthenticationError(
+                        "Request not permitted",
+                        status=response.status,
+                    )
+                if response.status == HTTP_TOO_MANY_REQUESTS:
                     raise MontaApiClientRateLimitError(
                         "Rate limit exceeded",
                         retry_after=self._parse_retry_after(
@@ -654,6 +665,21 @@ class MontaApiClient:
             token_data["refresh_token_expiration"] = refresh_token_expiration.isoformat()
 
         self._token_generation += 1
+
+        await self._token_storage.save(token_data)
+
+    async def _async_discard_access_token(self) -> None:
+        """Drop the refused access token so it is not handed out again.
+
+        The refresh token is left alone: it is a separate credential and the
+        API has said nothing about it. The generation counter is left alone
+        too, since nothing has been stored in the refused token's place yet
+        and a request still waiting has to see that for itself.
+        """
+        token_data = await self._ensure_token_data_loaded()
+
+        token_data["access_token"] = None
+        token_data["access_token_expiration"] = None
 
         await self._token_storage.save(token_data)
 

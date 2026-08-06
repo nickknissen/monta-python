@@ -15,7 +15,7 @@ import pytest
 
 from monta import MontaApiClientAuthenticationError
 
-from .conftest import FakeResponse, token_payload
+from .conftest import FakeResponse, RecordingTokenStorage, token_payload
 
 WALLET = {"id": 1, "balance": {"amount": 10.0, "currency": "DKK"}}
 
@@ -28,6 +28,11 @@ def ok(payload: dict) -> FakeResponse:
 def unauthorized() -> FakeResponse:
     """Return the response the API gives for a token it will not accept."""
     return FakeResponse(401, {"message": "Unauthorized"})
+
+
+def forbidden() -> FakeResponse:
+    """Return the response the API gives for a request it will not allow."""
+    return FakeResponse(403, {"message": "Forbidden"})
 
 
 async def test_first_call_authenticates_with_the_credentials(build_client) -> None:
@@ -139,8 +144,11 @@ async def test_refused_credentials_raise(build_client) -> None:
     """Credentials the API will not accept are the caller's problem."""
     client, _ = build_client({"auth/token": [unauthorized()]})
 
-    with pytest.raises(MontaApiClientAuthenticationError):
+    with pytest.raises(MontaApiClientAuthenticationError) as refusal:
         await client.async_get_personal_wallet()
+
+    assert refusal.value.status == 401
+    assert str(refusal.value) == "Invalid credentials"
 
 
 async def test_concurrent_refusals_replace_the_token_once(build_client) -> None:
@@ -171,6 +179,76 @@ async def test_concurrent_refusals_replace_the_token_once(build_client) -> None:
     assert all(result is not None for result in results)
     assert session.count("auth/refresh") == 1
     assert session.count("auth/token") == 1
+
+
+async def test_a_forbidden_request_is_not_retried(build_client) -> None:
+    """A 403 turns down the request, not the token it was carrying.
+
+    Both statuses arrive as the same authentication error, so retrying on the
+    error rather than the status would spend a refresh and a second request
+    to be told the same thing twice.
+    """
+    client, session = build_client(
+        {
+            "auth/token": [ok(token_payload("1"))],
+            "auth/refresh": [ok(token_payload("2"))],
+            "wallets/personal": [forbidden()],
+        }
+    )
+
+    with pytest.raises(MontaApiClientAuthenticationError) as refusal:
+        await client.async_get_personal_wallet()
+
+    # The credentials were accepted, so saying otherwise would send the caller
+    # after the wrong thing -- which is what sent hass-monta#321 there.
+    assert refusal.value.status == 403
+    assert str(refusal.value) == "Request not permitted"
+    assert session.count("wallets/personal") == 1
+    assert session.count("auth/refresh") == 0
+
+
+async def test_a_forbidden_refresh_does_not_fall_back_to_the_credentials(
+    build_client,
+) -> None:
+    """The fallback is for a refresh token the API refuses, not for a 403."""
+    client, session = build_client(
+        {
+            "auth/token": [ok(token_payload("1", timedelta(seconds=60)))],
+            "auth/refresh": [forbidden()],
+            "wallets/personal": [ok(WALLET)],
+        }
+    )
+
+    await client.async_get_personal_wallet()
+
+    with pytest.raises(MontaApiClientAuthenticationError):
+        await client.async_get_personal_wallet()
+
+    assert session.count("auth/refresh") == 1
+    assert session.count("auth/token") == 1
+
+
+async def test_a_refused_access_token_is_dropped_from_storage(build_client) -> None:
+    """The refused token is discarded in storage, not only in memory.
+
+    A store that outlives the process would otherwise hand the dead token
+    back on the next start, and the client would have to be refused all over
+    again to be rid of it.
+    """
+    storage = RecordingTokenStorage()
+    client, _ = build_client(
+        {
+            "auth/token": [ok(token_payload("1"))],
+            "auth/refresh": [ok(token_payload("2"))],
+            "wallets/personal": [ok(WALLET)],
+        },
+        rejected_tokens={"access-1"},
+        token_storage=storage,
+    )
+
+    await client.async_get_personal_wallet()
+
+    assert storage.access_tokens() == ["access-1", None, "access-2"]
 
 
 async def test_start_charge_survives_a_refused_token(build_client) -> None:

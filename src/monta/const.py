@@ -9,6 +9,12 @@ DEFAULT_TIMEOUT = 10
 # Token refresh settings
 PREEMPTIVE_REFRESH_TTL_IN_SECONDS = 300
 
+# HTTP statuses the client reacts to. 401 says the token was refused and 403
+# says the request was, which is why they are kept apart.
+HTTP_UNAUTHORIZED = 401
+HTTP_FORBIDDEN = 403
+HTTP_TOO_MANY_REQUESTS = 429
+
 # Private fields to filter from logs
 PRIVATE_INFORMATION = [
     "accessToken",

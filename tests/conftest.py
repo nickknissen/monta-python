@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
 
-from monta import MontaApiClient
+from monta import MontaApiClient, TokenStorage
 
 
 def iso(offset: timedelta) -> str:
@@ -44,6 +45,31 @@ class FakeResponse:
     async def json(self) -> Any:
         """Return the response body."""
         return self._payload
+
+
+class RecordingTokenStorage(TokenStorage):
+    """Token storage that keeps a copy of every set it was asked to save.
+
+    A store that outlives the process serialises what it is handed, so it
+    never sees a later in-place edit to the same dict. Copying here is what
+    makes a test able to tell a token that was dropped from one that was only
+    dropped in memory.
+    """
+
+    def __init__(self) -> None:
+        self.saved: list[dict[str, Any]] = []
+
+    async def load(self) -> dict[str, Any] | None:
+        """Return a copy of the last set saved, if there is one."""
+        return deepcopy(self.saved[-1]) if self.saved else None
+
+    async def save(self, data: dict[str, Any]) -> None:
+        """Record a copy of the set being saved."""
+        self.saved.append(deepcopy(data))
+
+    def access_tokens(self) -> list[str | None]:
+        """Return the access token in each saved set, in order."""
+        return [entry["access_token"] for entry in self.saved]
 
 
 class FakeSession:
@@ -119,12 +145,14 @@ def build_client():  # noqa: ANN201
     def build(
         responses: dict[str, list[FakeResponse]],
         rejected_tokens: set[str] | None = None,
+        token_storage: TokenStorage | None = None,
     ) -> tuple[MontaApiClient, FakeSession]:
         session = FakeSession(responses, rejected_tokens)
         client = MontaApiClient(
             client_id="client-id",
             client_secret="client-secret",
             session=session,  # type: ignore[arg-type]
+            token_storage=token_storage,
         )
         return client, session
 
